@@ -1,8 +1,10 @@
-import Head from 'next/head'
-import Image from 'next/image'
-import styles from '../styles/Home.module.css'
+import Head from "next/head";
+import fs from "fs";
+import Image from "next/image";
+import styles from "../styles/Home.module.css";
+import { parse } from "exifr";
 
-export default function Home() {
+export default function Home({ pix }) {
   return (
     <div className={styles.container}>
       <Head>
@@ -11,59 +13,50 @@ export default function Home() {
         <link rel="icon" href="/favicon.ico" />
       </Head>
 
-      <main className={styles.main}>
-        <h1 className={styles.title}>
-          Welcome to <a href="https://nextjs.org">Next.js!</a>
-        </h1>
-
-        <p className={styles.description}>
-          Get started by editing{' '}
-          <code className={styles.code}>pages/index.js</code>
-        </p>
-
-        <div className={styles.grid}>
-          <a href="https://nextjs.org/docs" className={styles.card}>
-            <h2>Documentation &rarr;</h2>
-            <p>Find in-depth information about Next.js features and API.</p>
-          </a>
-
-          <a href="https://nextjs.org/learn" className={styles.card}>
-            <h2>Learn &rarr;</h2>
-            <p>Learn about Next.js in an interactive course with quizzes!</p>
-          </a>
-
-          <a
-            href="https://github.com/vercel/next.js/tree/master/examples"
-            className={styles.card}
-          >
-            <h2>Examples &rarr;</h2>
-            <p>Discover and deploy boilerplate example Next.js projects.</p>
-          </a>
-
-          <a
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=default-template&utm_campaign=create-next-app"
-            className={styles.card}
-          >
-            <h2>Deploy &rarr;</h2>
-            <p>
-              Instantly deploy your Next.js site to a public URL with Vercel.
-            </p>
-          </a>
-        </div>
+      <main>
+        {pix.map(({ fname, width, height }) => {
+          return (
+            <div key={fname}>
+              <a href={`/${fname}`} download>
+                <Image
+                  src={`/${fname}`}
+                  alt="Vercel Logo"
+                  width={Math.floor(400)}
+                  height={Math.floor((400 * height) / width)}
+                />
+              </a>
+            </div>
+          );
+        })}
       </main>
-
-      <footer className={styles.footer}>
-        <a
-          href="https://vercel.com?utm_source=create-next-app&utm_medium=default-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Powered by{' '}
-          <span className={styles.logo}>
-            <Image src="/vercel.svg" alt="Vercel Logo" width={72} height={16} />
-          </span>
-        </a>
-      </footer>
     </div>
-  )
+  );
+}
+export async function getServerSideProps(context) {
+  let pix = fs
+    .readdirSync("./public")
+    .filter((f) => f.match(/.*/)?.length > 0)
+    .map((f) => f);
+
+  let parseDims = async function (pic) {
+    let dims = await parse("public/" + pic, [
+      "ExifImageWidth",
+      "ExifImageHeight",
+    ]);
+    return dims;
+  };
+
+  let pix_dims = pix.map((pic) => parseDims(pic));
+  let m = await Promise.all(pix_dims);
+  let pixes = [];
+
+  for (let i = 0; i < pix.length; i++) {
+    let item = {
+      fname: pix[i],
+      width: m[i].ExifImageWidth,
+      height: m[i].ExifImageHeight,
+    };
+    pixes.push(item);
+  }
+  return { props: { pix: pixes } };
 }
